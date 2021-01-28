@@ -1,21 +1,27 @@
-from typing import Union, Sequence
-
+import os
+import pprint
 import eagerpy as ep
 import foolbox as fb
 import numpy as np
 import torch
+import torchvision
 import torchvision.models as models
 
+from typing import Union, Sequence
 from eagerpy import Tensor
 
-from src.config import LABEL_MAPPING
-from src.utils.general import timeit
+from src.config import DATA_PATH
+from src.util.general import timeit
+
+pp = pprint.PrettyPrinter(indent=4, width=120)
 
 CONFIG = {
     "epsilons": np.linspace(0.001, 0.005, num=1),
     "bounds": (0, 1),
     "preprocessing": dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], axis=-3),
     "attack": fb.attacks.LinfFastGradientAttack(),
+    "save_adversaries": True,
+    "target_dir": os.path.join(DATA_PATH, "adversarials")
 }
 
 
@@ -67,25 +73,30 @@ def run_attack(fb_attack: fb.Attack, foolbox_model: fb.PyTorchModel, images: ep.
     robust_accuracy = 1 - ep.astensor(is_adv.type(torch.FloatTensor)).mean(axis=-1)
 
     print("Predictions and robust accuracies: ")
-    for i, (eps, acc) in enumerate(zip(epsilons, robust_accuracy)):
+    for i, (eps, acc, clipped_adv) in enumerate(zip(epsilons, robust_accuracy, clipped)):
         print(f"!!!! Linf norm ≤ {eps:<6}: {acc.item() * 100:4.1f} %")
-        adversarials = [j for j, adv in enumerate(is_adv[i]) if adv == True]
-        for adv_idx in adversarials:
-            img = images[adv_idx]
-            adv_img = clipped[i][adv_idx]
-            print(f"Ground truth label: '{labels[adv_idx]}'")
+        adversarial_mask = torch.nonzero(is_adv.flatten()).flatten()
+        original_images = images[adversarial_mask]
+        adversarial_images = clipped_adv[adversarial_mask]
 
-            original_label_id = foolbox_model(img.unsqueeze(0)).argmax().item()
-            adv_label_id = foolbox_model(adv_img.unsqueeze(0)).argmax().item()
-            print(f"Original prediction: {original_label_id}")
-            print(f"Adversarial prediction: {adv_label_id}")
-            print("")
+        original_pred = foolbox_model(original_images).argmax(axis=-1)
+        adv_pred = foolbox_model(adversarial_images).argmax(axis=-1)
+        ground_truth_labels = labels[adversarial_mask]
 
-        # first_adv_idx = np.random.choice(adversarials)
-        # torchvision.utils.save_image(images[first_adv_idx],
-        #                              os.path.join(get_root(), f"test_images/{first_adv_idx}_orig_eps_{eps}.jpg"))
-        # torchvision.utils.save_image(clipped[i][first_adv_idx],
-        #                              os.path.join(get_root(), f"test_images/{first_adv_idx}_adv_eps_{eps}.jpg"))
+        pp.pprint(f"Ground truth: {ground_truth_labels}")
+        pp.pprint(f"Original:     {original_pred}")
+        pp.pprint(f"Adversarial:  {adv_pred}")
+
+        if config["save_adversaries"]:
+            target_dir = os.path.join(config["target_dir"], fb_attack.__class__.__name__)
+            os.makedirs(target_dir, exist_ok=True)
+            print(f"Saving original & adversarial images in directory '{target_dir}'.")
+
+            for original_img, adv_img, image_index in zip(original_images, adversarial_images, adversarial_mask):
+                original_path = os.path.join(target_dir, f"{image_index}_orig_eps_{eps}.jpg")
+                adv_path = os.path.join(target_dir, f"{image_index}_adv_eps_{eps}.jpg")
+                torchvision.utils.save_image(original_img, original_path)
+                torchvision.utils.save_image(adv_img, adv_path)
 
 
 if __name__ == '__main__':
