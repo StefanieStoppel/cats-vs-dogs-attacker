@@ -3,7 +3,7 @@ import pandas as pd
 
 from typing import List
 
-from src.config import DATA_PATH, TRAIN_CSV, TEST_CSV
+from src.config import DATA_PATH
 
 
 def save_dogs_vs_cats_dataframes(data_path, target_paths: List[str]):

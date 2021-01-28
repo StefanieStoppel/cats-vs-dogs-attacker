@@ -3,12 +3,16 @@ import pprint
 import eagerpy as ep
 import foolbox as fb
 import numpy as np
+import pandas as pd
 import torch
 import torchvision
 import torchvision.models as models
 
 from typing import Union, Sequence
 from eagerpy import Tensor
+from torch.utils.data import DataLoader
+from torchvision import datasets
+from torchvision.transforms import transforms
 
 from src.config import DATA_PATH
 from src.util.general import timeit
@@ -16,12 +20,24 @@ from src.util.general import timeit
 pp = pprint.PrettyPrinter(indent=4, width=120)
 
 CONFIG = {
+    # Directories
+    "target_dir": os.path.join(DATA_PATH, "adversarials"),
+    "train_dir": os.path.join(DATA_PATH, "train"),
+    "test_dir": os.path.join(DATA_PATH, "test"),
+    "train_csv": os.path.join(DATA_PATH, "train_list.csv"),
+    "test_csv": os.path.join(DATA_PATH, "test_list.csv"),
+
+    # Attack
     "epsilons": np.linspace(0.001, 0.005, num=1),
     "bounds": (0, 1),
     "preprocessing": dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], axis=-3),
     "attack": fb.attacks.LinfFastGradientAttack(),
     "save_adversaries": True,
-    "target_dir": os.path.join(DATA_PATH, "adversarials")
+
+    # Training
+    "validation_split": 0.2,
+    "batch_size": 64,
+    "num_workers": 2,
 }
 
 
@@ -47,7 +63,7 @@ def filter_correctly_classified(foolbox_model: fb.PyTorchModel, images: Tensor, 
 def get_correctly_classified_mask(foolbox_model: fb.PyTorchModel, images: ep.Tensor, labels: ep.Tensor):
     """
     Checks whether the model predicts the "correct", ground-truth labels for the (non-adversarial) input images.
-    :param model: foolbox model
+    :param foolbox_model: Foolbox-wrapped PyTorch model
     :param images: tensor of non-adversarial images (B, C, W, H)
     :param labels: tensor of ground truth labels for the images (B, N), where N = number of classes
     :return: boolean tensor containing True for images that were correctly classified by the model, and False otherwise
@@ -59,13 +75,17 @@ def get_correctly_classified_mask(foolbox_model: fb.PyTorchModel, images: ep.Ten
     return restore_type_images(predictions == labels_)
 
 
-def run_attack(fb_attack: fb.Attack, foolbox_model: fb.PyTorchModel, images: ep.Tensor, labels: ep.Tensor, config):
+def run_attack(fb_attack: fb.Attack, foolbox_model: fb.PyTorchModel, images: torch.Tensor, labels: torch.Tensor,
+               config):
     print(f"Initial accuracy on images: {fb.utils.accuracy(foolbox_model, images, labels)}")
 
     # filter input images and labels so that only the ones which are correctly classified are kept
     print(f"before filtering: {images.shape}; {labels.shape}")
     images, labels = filter_correctly_classified(foolbox_model, images, labels)
     print(f"after filtering: {images.shape}; {labels.shape}")
+    if images.nelement() == 0:
+        raise SystemExit("SYSTEM_EXIT: No images left after filtering. Are you sure you trained your model correctly "
+                         "to classify the input images?")
 
     epsilons = config["epsilons"]
     raw, clipped, is_adv = attack_model(fb_attack, foolbox_model, images, labels, epsilons)
@@ -100,14 +120,41 @@ def run_attack(fb_attack: fb.Attack, foolbox_model: fb.PyTorchModel, images: ep.
 
 
 if __name__ == '__main__':
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # GPU or CPU
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    # Load data
+    train_list = pd.read_csv(CONFIG["train_csv"]).sample(frac=1).values.flatten().tolist()
+    test_list = pd.read_csv(CONFIG["test_csv"]).sample(frac=1).values.flatten().tolist()
+
+    train_transforms = transforms.Compose([transforms.RandomRotation(30),
+                                           transforms.RandomResizedCrop(224),
+                                           transforms.RandomHorizontalFlip(),
+                                           transforms.ToTensor(),
+                                           transforms.Normalize([0.485, 0.456, 0.406],
+                                                                [0.229, 0.224, 0.225])])
+
+    dogs_vs_cats_dataset = datasets.ImageFolder(CONFIG["train_dir"], transform=train_transforms)
+    train_val_split = [int((1 - CONFIG["validation_split"]) * len(dogs_vs_cats_dataset)),
+                       int(CONFIG["validation_split"] * len(dogs_vs_cats_dataset))]
+    train_dataset, validation_dataset = torch.utils.data.random_split(dogs_vs_cats_dataset, train_val_split)
+    # test_dataset = datasets.ImageFolder(CONFIG["test_dir"])
+    train_loader = DataLoader(train_dataset, batch_size=CONFIG["batch_size"],
+                              shuffle=True, num_workers=CONFIG["num_workers"])
+    # test_loader = DataLoader(test_dataset, batch_size=CONFIG["batch_size"])
+
+    images, labels = next(iter(train_loader))
+    images = images.to(device)
+    labels = labels.to(device)
+
+    # Load model
     model = models.vgg16(pretrained=True)
-    # model = model.to(device)
+    model = model.to(device)
     model.eval()
 
-    fmodel = fb.PyTorchModel(model, bounds=CONFIG["bounds"], preprocessing=CONFIG["preprocessing"])
-    images, labels = fb.utils.samples(fmodel, dataset='imagenet', batchsize=20)
+    fmodel = wrap_model(model, bounds=CONFIG["bounds"], preprocessing=CONFIG["preprocessing"])
+
+    # images, labels = fb.utils.samples(fmodel, dataset='imagenet', batchsize=20)
 
     attack = CONFIG["attack"]
 
