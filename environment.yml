@@ -1,0 +1,6 @@
+name: cats-vs-dogs-attacker
+channels:
+  - defaults
+dependencies:
+  - python>=3.7
+  - pip
