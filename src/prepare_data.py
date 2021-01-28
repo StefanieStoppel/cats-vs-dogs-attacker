@@ -22,6 +22,16 @@ def save_dogs_vs_cats_dataframes(data_path, target_paths: List[str]):
     test_dogs_vs_cats.to_csv(os.path.abspath(target_paths[1]), index=False)
 
 
+def save_dogs_vs_cats_file_list(data_path, target_file_name):
+    file_list = list()
+    for root, dirs, files in os.walk(data_path):
+        for file in files:
+            if file.endswith(".jpg"):
+                parent_dir = os.path.basename(root)
+                file_list.append(f"{parent_dir}/{file}")
+    pd.DataFrame(file_list).to_csv(os.path.join(data_path, target_file_name), index=False, header=False)
+
+
 def get_images_and_labels(dir_path, is_test=False):
     images, labels = list(), list()
     for file in os.listdir(dir_path):
@@ -40,6 +50,8 @@ def load_dogs_vs_cats_dataframes(train_csv, test_csv):
 
 
 if __name__ == '__main__':
-    train_csv_path = os.path.join(DATA_PATH, TRAIN_CSV)
-    test_csv_path = os.path.join(DATA_PATH, TEST_CSV)
-    save_dogs_vs_cats_dataframes(DATA_PATH, [train_csv_path, test_csv_path])
+    # train_csv_path = os.path.join(DATA_PATH, TRAIN_CSV)
+    # test_csv_path = os.path.join(DATA_PATH, TEST_CSV)
+    # save_dogs_vs_cats_dataframes(DATA_PATH, [train_csv_path, test_csv_path])
+    # save_dogs_vs_cats_file_list(os.path.join(DATA_PATH, "train"), os.path.join(DATA_PATH, "train_list.csv"))
+    save_dogs_vs_cats_file_list(os.path.join(DATA_PATH, "test"), os.path.join(DATA_PATH, "test_list.csv"))
