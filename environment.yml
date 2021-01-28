@@ -11,4 +11,5 @@ dependencies:
   - numpy
   - pandas
   - pytorch
+  - pytorch-lightning
   - torchvision
