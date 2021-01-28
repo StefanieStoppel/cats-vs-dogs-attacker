@@ -14,8 +14,9 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import transforms
 
+from dataloader import get_dogs_vs_cats_data_splits
 from src.config import DATA_PATH
-from src.util.general import timeit
+from src.util import timeit
 
 pp = pprint.PrettyPrinter(indent=4, width=120)
 
@@ -134,13 +135,15 @@ if __name__ == '__main__':
                                            transforms.Normalize([0.485, 0.456, 0.406],
                                                                 [0.229, 0.224, 0.225])])
 
-    dogs_vs_cats_dataset = datasets.ImageFolder(CONFIG["train_dir"], transform=train_transforms)
-    train_val_split = [int((1 - CONFIG["validation_split"]) * len(dogs_vs_cats_dataset)),
-                       int(CONFIG["validation_split"] * len(dogs_vs_cats_dataset))]
-    train_dataset, validation_dataset = torch.utils.data.random_split(dogs_vs_cats_dataset, train_val_split)
+    # dogs_vs_cats_dataset = datasets.ImageFolder(CONFIG["train_dir"], transform=train_transforms)
+    # train_val_split = [int((1 - CONFIG["validation_split"]) * len(dogs_vs_cats_dataset)),
+    #                    int(CONFIG["validation_split"] * len(dogs_vs_cats_dataset))]
+    train_dataset, validation_dataset, test_dataset = get_dogs_vs_cats_data_splits(CONFIG["train_dir"])
     # test_dataset = datasets.ImageFolder(CONFIG["test_dir"])
     train_loader = DataLoader(train_dataset, batch_size=CONFIG["batch_size"],
                               shuffle=True, num_workers=CONFIG["num_workers"])
+    validation_loader = DataLoader(validation_dataset, batch_size=CONFIG["batch_size"],
+                                   shuffle=True, num_workers=CONFIG["num_workers"])
     # test_loader = DataLoader(test_dataset, batch_size=CONFIG["batch_size"])
 
     images, labels = next(iter(train_loader))
