@@ -1,6 +1,6 @@
 import torch
 import pytorch_lightning as pl
-from torch.nn import BCEWithLogitsLoss
+from torch.nn import CrossEntropyLoss
 from torchvision import models
 
 from src.util import weight_reset
@@ -8,11 +8,11 @@ from src.util import weight_reset
 
 class LitVGG16Model(pl.LightningModule):
 
-    def __init__(self, lr=1e-3, num_classes=1):
+    def __init__(self, lr=1e-3, num_classes=2):
         super().__init__()
         self.lr = lr
         self.num_classes = num_classes
-        self.loss = BCEWithLogitsLoss()
+        self.loss = CrossEntropyLoss()
         self.model = models.vgg16(pretrained=True)
 
         # freeze layers
@@ -39,6 +39,7 @@ class LitVGG16Model(pl.LightningModule):
     def forward(self, x):
         x = x.view(x.size(0), -1)
         x = self.model(x)
+        x = torch.sigmoid(x)
         return x
 
     def configure_optimizers(self):
@@ -48,8 +49,6 @@ class LitVGG16Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         image, label = batch
         pred_label = self.model(image)
-        pred_label = pred_label.flatten()
-        label = label.type_as(pred_label)
         loss = self.loss(pred_label, label)
         self.log("train_loss", loss, on_step=True, logger=True)
         return loss
@@ -57,8 +56,6 @@ class LitVGG16Model(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         image, label = batch
         pred_label = self.model(image)
-        pred_label = pred_label.flatten()
-        label = label.type_as(pred_label)
         val_loss = self.loss(pred_label, label)
         self.log("val_loss", val_loss, logger=True)
         return val_loss
@@ -66,8 +63,6 @@ class LitVGG16Model(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         image, label = batch
         pred_label = self.model(image)
-        pred_label = pred_label.flatten()
-        label = label.type_as(pred_label)
         loss = self.loss(pred_label, label)
         self.log("test_loss", loss, logger=True)
         return loss
