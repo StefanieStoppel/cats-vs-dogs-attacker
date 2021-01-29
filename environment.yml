@@ -13,3 +13,5 @@ dependencies:
   - pytorch
   - pytorch-lightning
   - torchvision
+  - pip:
+    - lime
