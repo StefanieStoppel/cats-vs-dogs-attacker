@@ -4,10 +4,9 @@ from pytorch_lightning import loggers as pl_loggers, Trainer
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
-from config import DATA_PATH
+from config import DATA_PATH, LOGS_PATH
 from dataloader import get_dogs_vs_cats_data_splits
 from lit_model import LitVGG16Model
-from src import ROOT_DIR
 
 
 def run(config):
@@ -15,7 +14,7 @@ def run(config):
 
     train_dataset, validation_dataset, test_dataset = get_dogs_vs_cats_data_splits(
         config["train_dir"],
-        config["data_splits"],
+        config["data_split"],
         transform=config["transform"]
     )
     train_loader = DataLoader(train_dataset, batch_size=config["batch_size"],
@@ -38,7 +37,7 @@ if __name__ == '__main__':
         "test_dir": os.path.join(DATA_PATH, "test"),
         "train_csv": os.path.join(DATA_PATH, "train_list.csv"),
         "test_csv": os.path.join(DATA_PATH, "test_list.csv"),
-        "logs_dir": os.path.join(ROOT_DIR, "logs"),
+        "logs_dir": LOGS_PATH,
 
         # Transform images
         "transform": transforms.Compose([transforms.RandomRotation(30),
@@ -49,7 +48,7 @@ if __name__ == '__main__':
                                                               [0.229, 0.224, 0.225])]),
 
         # Training
-        "data_splits": (0.7, 0.2, 0.1),
+        "data_split": (0.7, 0.2, 0.1),
         "batch_size": 128,
         "num_workers": 8,
         "lr": 1e-3
