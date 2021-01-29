@@ -11,23 +11,30 @@ class LitVGG16Model(pl.LightningModule):
     def __init__(self, lr=1e-3, num_classes=1):
         super().__init__()
         self.lr = lr
+        self.num_classes = num_classes
         self.loss = BCEWithLogitsLoss()
         self.model = models.vgg16(pretrained=True)
+
         # freeze layers
         for param in self.model.parameters():
             param.requires_grad = False
 
-        # reset and change classification head
-        classification_head = self.model.classifier
-        classification_head.apply(weight_reset)
-        classification_head.add_module("7", torch.nn.Linear(in_features=1000, out_features=num_classes))
-        self.model.classifier = classification_head
+        # add layers to classification head, reset weights and make it trainable
+        self.model.classifier = self._customize_classification_head(self.model.classifier, self.num_classes)
+
+    @staticmethod
+    def _customize_classification_head(classification_head, num_classes):
+        classification_head_ = classification_head
+        classification_head_.apply(weight_reset)
+        classification_head_.add_module("7", torch.nn.Linear(in_features=1000, out_features=num_classes))
 
         # set classifier layers trainable
-        for layer in self.model.classifier:
+        for layer in classification_head_:
             if isinstance(layer, torch.nn.Conv2d) or isinstance(layer, torch.nn.Linear):
                 layer.weight.requires_grad = True
                 layer.bias.requires_grad = True
+
+        return classification_head_
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
