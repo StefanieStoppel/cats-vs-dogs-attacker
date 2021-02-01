@@ -1,6 +1,7 @@
 from functools import wraps
 from time import time
-
+from PIL import Image
+from numpy import asarray
 from torch import nn
 
 
@@ -18,3 +19,8 @@ def timeit(func):
 def weight_reset(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         m.reset_parameters()
+
+
+def load_image_as_numpy_array(image_path: str):
+    image = Image.open(image_path)
+    return asarray(image)
