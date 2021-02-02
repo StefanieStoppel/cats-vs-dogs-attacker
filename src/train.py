@@ -30,6 +30,25 @@ def run(config):
     trainer.fit(lit_vgg16_model, train_loader, validation_loader)
 
 
+def run_test(config):
+    lit_vgg16_model = LitVGG16Model.load_from_checkpoint(
+        checkpoint_path=config["checkpoint"]
+    )
+    train_dataset, validation_dataset, test_dataset = get_dogs_vs_cats_data_splits(
+        config["train_dir"],
+        config["data_split"],
+        transform=config["transform"]
+    )
+
+    test_loader = DataLoader(test_dataset, batch_size=config["batch_size"],
+                             shuffle=False, num_workers=config["num_workers"])
+
+    tb_logger = pl_loggers.TensorBoardLogger(config["logs_dir"])
+    trainer = Trainer(logger=tb_logger, gpus=1)
+
+    trainer.test(model=lit_vgg16_model, test_dataloaders=test_loader)
+
+
 if __name__ == '__main__':
     CONFIG = {
         # Directories
@@ -38,6 +57,8 @@ if __name__ == '__main__':
         "train_csv": os.path.join(DATA_PATH, "train_list.csv"),
         "test_csv": os.path.join(DATA_PATH, "test_list.csv"),
         "logs_dir": LOGS_PATH,
+        "checkpoint": os.path.join(LOGS_PATH, "default/version_10/checkpoints/epoch=0-step=136.ckpt"),
+        # "checkpoint": "best",
 
         # Transform images
         "transform": transforms.Compose([transforms.RandomRotation(30),
@@ -51,6 +72,7 @@ if __name__ == '__main__':
         "data_split": (0.7, 0.2, 0.1),
         "batch_size": 128,
         "num_workers": 8,
-        "lr": 1e-3
+        "lr": 1e-4
     }
-    run(CONFIG)
+    run_test(CONFIG)
+    # run(CONFIG)
