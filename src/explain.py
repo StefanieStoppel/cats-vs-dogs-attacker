@@ -1,22 +1,24 @@
 import os
-from functools import partial
-from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision
-from lime.wrappers.scikit_image import SegmentationAlgorithm
 
+from functools import partial
+from typing import Callable, Tuple
+from captum.attr import DeepLift
+from lime.wrappers.scikit_image import SegmentationAlgorithm
 from torchvision.io import read_image
 from torchvision.transforms import transforms
 
 from config import LOGS_PATH
+from explanations.captum_explainer import CaptumExplainer
 from explanations.captum_lime_explainer import CaptumLimeExplainer
 from explanations.lime_explainer import LimeExplainer
 from lit_model import LitVGG16Model
-from util import load_image_as_numpy_array, pil_read, timeit
+from util import load_image_as_numpy_array, pil_read, timeit, inverse_normalize
 
 
 def explain(explainer, model, classifier_function: Callable, original_image: np.array, adversarial_image: np.array):
@@ -33,11 +35,11 @@ def explain(explainer, model, classifier_function: Callable, original_image: np.
 
 
 @timeit
-def explain_captum(model,
-                   classifier_function: Callable,
-                   images: torch.Tensor,
-                   labels: torch.Tensor,
-                   segments: np.array):
+def explain_captum_lime(model,
+                        classifier_function: Callable,
+                        images: torch.Tensor,
+                        labels: torch.Tensor,
+                        segments: np.array):
     model.eval()
 
     captum_lime_exlainer = CaptumLimeExplainer(random_seed=CONFIG["random_seed"])
@@ -51,6 +53,15 @@ def explain_captum(model,
     #                                         labels[1],
     #                                         segments[1],
     #                                         classifier_func=classifier_function)
+
+
+def explain_captum_deeplift(explainer: CaptumExplainer,
+                            model: torch.nn.Module,
+                            images: torch.Tensor,
+                            labels: torch.Tensor,
+                            titles: Tuple):
+    attr_dl = explainer.explain(model, images, labels, baselines=images * 0)
+    explainer.visualize(attr_dl, images, titles=titles)
 
 
 def classify_dogs_vs_cats(model, device, images_np: np.array):
@@ -69,8 +80,8 @@ def classify_function(model, images):
 if __name__ == '__main__':
     CONFIG = {
         # Paths
-        "original_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/adversarials/LinfFastGradientAttack/0.005/cat.86_orig.jpg",
-        "adversarial_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/adversarials/LinfFastGradientAttack/0.005/cat.86_adv.jpg",
+        "original_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/3_conker_orig_eps_0.01.jpg",
+        "adversarial_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/3_conker_adv_eps_0.01.jpg",
         "checkpoint": os.path.join(LOGS_PATH, "default/version_1/checkpoints/epoch=0-step=136.ckpt"),
 
         # other
@@ -85,13 +96,14 @@ if __name__ == '__main__':
     device = torch.device('cuda' if (torch.cuda.is_available() and CONFIG["use_cuda"]) else 'cpu')
 
     # Load model
-    lit_model = LitVGG16Model.load_from_checkpoint(checkpoint_path=CONFIG["checkpoint"])
-    # model = torchvision.models.vgg16(pretrained=True)
-    model = lit_model.model
+    # lit_model = LitVGG16Model.load_from_checkpoint(checkpoint_path=CONFIG["checkpoint"])
+    model = torchvision.models.vgg16(pretrained=True)
+    # model = lit_model.model
     model = model.to(device)
 
     # Explainer
-    lime_explainer = LimeExplainer(random_seed=CONFIG["random_seed"])
+    # lime_explainer = LimeExplainer(random_seed=CONFIG["random_seed"])
+    deeplift_explainer = CaptumExplainer(DeepLift, model)
 
     # Load images as numpy arrays
     original_img_np = load_image_as_numpy_array(CONFIG["original_image_path"])
@@ -111,12 +123,14 @@ if __name__ == '__main__':
     adversarial_img_tensor = transform(pil_read(CONFIG["adversarial_image_path"]))
     images_tensor = torch.stack((original_img_tensor, adversarial_img_tensor), dim=0).to(device)
     # images_tensor = (images_tensor / 255.0).to(device)
-    # labels_tensor = torch.tensor((243, 242)).to(device)
-    labels_tensor = [1, 0]
+    labels_tensor = torch.tensor((990, 73)).to(device)
+    plot_titles = ("DeepLIFT for conker (990, original)", "DeepLIFT for barn spider (73, adversarial)")
+    # labels_tensor = [1, 0]
 
     # Create classifier function
     classifier_func = partial(classify_dogs_vs_cats, model, device)
     # classifier_func = partial(classify_function, model)
 
-    explain(lime_explainer, model, classifier_func, original_img_np, adversarial_img_np)
-    # explain_captum(model, classifier_func, images_tensor, labels_tensor, segments)
+    explain_captum_deeplift(deeplift_explainer, model, images_tensor, labels_tensor, titles=plot_titles)
+    # explain(lime_explainer, model, classifier_func, original_img_np, adversarial_img_np)
+    # explain_captum_lime(model, classifier_func, images_tensor, labels_tensor, segments)
