@@ -21,6 +21,12 @@ def weight_reset(m):
         m.reset_parameters()
 
 
+def inverse_normalize(tensor, mean, std):
+    for t, m, s in zip(tensor, mean, std):
+        t.mul_(s).add_(m)
+    return tensor
+
+
 def numpy_to_pil(np_array):
     image = Image.fromarray(np_array)
     return image
