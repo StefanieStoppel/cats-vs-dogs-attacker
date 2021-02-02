@@ -12,7 +12,14 @@ class LitVGG16Model(pl.LightningModule):
         super().__init__()
         self.lr = lr
         self.num_classes = num_classes
+
         self.loss = CrossEntropyLoss()
+
+        # metrics
+        self.train_accuracy = pl.metrics.Accuracy()
+        self.validation_accuracy = pl.metrics.Accuracy()
+        self.test_accuracy = pl.metrics.Accuracy()
+
         self.model = models.vgg16(pretrained=True)
 
         # freeze layers
@@ -46,28 +53,43 @@ class LitVGG16Model(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
-    def training_step(self, batch, batch_idx):
-        image, label = batch
+    def _predict(self, batch):
+        image, label, _ = batch
         pred_label = self.model(image)
         loss = self.loss(pred_label, label)
+        return label, loss, pred_label
+
+    def training_step(self, batch, batch_idx):
+        label, loss, pred_label = self._predict(batch)
         self.log("train_loss", loss, on_step=True, logger=True)
+        self.train_accuracy(pred_label, label)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        image, label = batch
-        pred_label = self.model(image)
-        val_loss = self.loss(pred_label, label)
-        self.log("val_loss", val_loss, logger=True)
-        return val_loss
+        label, loss, pred_label = self._predict(batch)
+        self.log("val_loss", loss, logger=True)
+        self.validation_accuracy(pred_label, label)
+        return loss
 
     def test_step(self, batch, batch_idx):
-        image, label = batch
-        pred_label = self.model(image)
-        loss = self.loss(pred_label, label)
+        label, loss, pred_label = self._predict(batch)
         self.log("test_loss", loss, logger=True)
+        self.test_accuracy(pred_label, label)
         return loss
+
+    def training_epoch_end(self, outs):
+        self.log("train_acc_epoch", self.train_accuracy.compute())
+
+    def test_epoch_end(self, outs):
+        self.log("test_acc_epoch", self.test_accuracy.compute())
+
+    @staticmethod
+    def _print_correct_ratio(label, pred_label):
+        predicted_labels = pred_label.argmax(-1)
+        batch_size = len(label)
+        correct_count = torch.sum((predicted_labels == label)).item()
+        print("\ncorrect / batch: ", correct_count, "/", batch_size)
 
 
 if __name__ == '__main__':
     lit = LitVGG16Model()
-    print()
