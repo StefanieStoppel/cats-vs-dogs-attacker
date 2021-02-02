@@ -22,7 +22,7 @@ CONFIG = {
     # Directories
     "target_dir": os.path.join(DATA_PATH, "adversarials"),
     "train_dir": os.path.join(DATA_PATH, "train"),
-    "checkpoint": os.path.join(LOGS_PATH, "default/version_1/checkpoints/epoch=0-step=136.ckpt"),
+    "checkpoint": os.path.join(LOGS_PATH, "default/version_10/checkpoints/epoch=0-step=136.ckpt"),
 
     # Attack
     # "epsilons": np.linspace(0.001, 0.005, num=1),
@@ -172,7 +172,6 @@ def run():
     model = model.to(device)
     model.eval()
 
-    # todo: do I still need to set preprocessing? DataLoader does this as well
     fmodel = wrap_model(model, bounds=CONFIG["bounds"], preprocessing=CONFIG["preprocessing"], device=device)
 
     attack = CONFIG["attack"]

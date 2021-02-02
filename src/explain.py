@@ -80,9 +80,9 @@ def classify_function(model, images):
 if __name__ == '__main__':
     CONFIG = {
         # Paths
-        "original_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/3_conker_orig_eps_0.01.jpg",
-        "adversarial_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/3_conker_adv_eps_0.01.jpg",
-        "checkpoint": os.path.join(LOGS_PATH, "default/version_1/checkpoints/epoch=0-step=136.ckpt"),
+        "original_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/adversarials/LinfFastGradientAttack/0.005/cat.11489_orig.jpg",
+        "adversarial_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/adversarials/LinfFastGradientAttack/0.005/cat.11489_adv.jpg",
+        "checkpoint": os.path.join(LOGS_PATH, "default/version_10/checkpoints/epoch=0-step=136.ckpt"),
 
         # other
         "random_seed": 42,
@@ -96,9 +96,9 @@ if __name__ == '__main__':
     device = torch.device('cuda' if (torch.cuda.is_available() and CONFIG["use_cuda"]) else 'cpu')
 
     # Load model
-    # lit_model = LitVGG16Model.load_from_checkpoint(checkpoint_path=CONFIG["checkpoint"])
-    model = torchvision.models.vgg16(pretrained=True)
-    # model = lit_model.model
+    lit_model = LitVGG16Model.load_from_checkpoint(checkpoint_path=CONFIG["checkpoint"])
+    # model = torchvision.models.vgg16(pretrained=True)
+    model = lit_model.model
     model = model.to(device)
 
     # Explainer
@@ -123,8 +123,11 @@ if __name__ == '__main__':
     adversarial_img_tensor = transform(pil_read(CONFIG["adversarial_image_path"]))
     images_tensor = torch.stack((original_img_tensor, adversarial_img_tensor), dim=0).to(device)
     # images_tensor = (images_tensor / 255.0).to(device)
-    labels_tensor = torch.tensor((990, 73)).to(device)
-    plot_titles = ("DeepLIFT for conker (990, original)", "DeepLIFT for barn spider (73, adversarial)")
+    # labels_tensor = torch.tensor((990, 73)).to(device)
+
+    # cat: 0; dog: 1
+    labels_tensor = torch.tensor((0, 1)).to(device)
+    plot_titles = ("DeepLIFT for cat (0, original)", "DeepLIFT for dog (1, adversarial)")
     # labels_tensor = [1, 0]
 
     # Create classifier function
