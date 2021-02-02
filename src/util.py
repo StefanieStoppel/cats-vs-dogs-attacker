@@ -21,6 +21,15 @@ def weight_reset(m):
         m.reset_parameters()
 
 
+def numpy_to_pil(np_array):
+    image = Image.fromarray(np_array)
+    return image
+
+
+def pil_read(image_path: str):
+    return Image.open(image_path)
+
+
 def load_image_as_numpy_array(image_path: str):
-    image = Image.open(image_path)
+    image = pil_read(image_path)
     return asarray(image)

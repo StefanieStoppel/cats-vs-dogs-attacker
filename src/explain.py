@@ -6,14 +6,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision
+from lime.wrappers.scikit_image import SegmentationAlgorithm
 
 from torchvision.io import read_image
 from torchvision.transforms import transforms
 
 from config import LOGS_PATH
+from explanations.captum_lime_explainer import CaptumLimeExplainer
 from explanations.lime_explainer import LimeExplainer
 from lit_model import LitVGG16Model
-from util import load_image_as_numpy_array
+from util import load_image_as_numpy_array, pil_read, timeit
 
 
 def explain(explainer, model, classifier_function: Callable, original_image: np.array, adversarial_image: np.array):
@@ -23,10 +26,31 @@ def explain(explainer, model, classifier_function: Callable, original_image: np.
     orig_boundary = explainer.explain(original_image, classifier_func=classifier_function)
     adv_boundary = explainer.explain(adversarial_image, classifier_func=classifier_function)
 
-    f, ax = plt.subplots(1, 2)
-    ax[0].imshow(orig_boundary)
-    ax[1].imshow(adv_boundary)
-    plt.show()
+    # f, ax = plt.subplots(1, 2)
+    # ax[0].imshow(orig_boundary)
+    # ax[1].imshow(adv_boundary)
+    # plt.show()
+
+
+@timeit
+def explain_captum(model,
+                   classifier_function: Callable,
+                   images: torch.Tensor,
+                   labels: torch.Tensor,
+                   segments: np.array):
+    model.eval()
+
+    captum_lime_exlainer = CaptumLimeExplainer(random_seed=CONFIG["random_seed"])
+    orig_expl = captum_lime_exlainer.explain(model,
+                                             images,
+                                             labels,
+                                             segments,
+                                             classifier_func=classifier_function)
+    # adv_expl = captum_lime_exlainer.explain(model,
+    #                                         images[1].unsqueeze(0),
+    #                                         labels[1],
+    #                                         segments[1],
+    #                                         classifier_func=classifier_function)
 
 
 def classify_dogs_vs_cats(model, device, images_np: np.array):
@@ -36,22 +60,22 @@ def classify_dogs_vs_cats(model, device, images_np: np.array):
     return probs.detach().cpu().numpy()
 
 
+def classify_function(model, images):
+    logits = model(images)
+    # probs = F.softmax(logits, dim=1)
+    return logits
+
+
 if __name__ == '__main__':
     CONFIG = {
         # Paths
-        "original_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/"
-                               "adversarials/LinfFastGradientAttack/0.005/cat.55_orig.jpg",
-        "adversarial_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/"
-                                  "adversarials/LinfFastGradientAttack/0.005/cat.55_adv.jpg",
+        "original_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/adversarials/LinfFastGradientAttack/0.005/cat.86_orig.jpg",
+        "adversarial_image_path": "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/adversarials/LinfFastGradientAttack/0.005/cat.86_adv.jpg",
         "checkpoint": os.path.join(LOGS_PATH, "default/version_1/checkpoints/epoch=0-step=136.ckpt"),
-
 
         # other
         "random_seed": 42,
-        "transform": transforms.Compose([transforms.RandomRotation(30),
-                                         transforms.RandomResizedCrop(224),
-                                         transforms.RandomHorizontalFlip(),
-                                         transforms.ToTensor(),
+        "transform": transforms.Compose([transforms.ToTensor(),
                                          transforms.Normalize([0.485, 0.456, 0.406],
                                                               [0.229, 0.224, 0.225])]),
         "use_cuda": True
@@ -62,6 +86,7 @@ if __name__ == '__main__':
 
     # Load model
     lit_model = LitVGG16Model.load_from_checkpoint(checkpoint_path=CONFIG["checkpoint"])
+    # model = torchvision.models.vgg16(pretrained=True)
     model = lit_model.model
     model = model.to(device)
 
@@ -72,12 +97,26 @@ if __name__ == '__main__':
     original_img_np = load_image_as_numpy_array(CONFIG["original_image_path"])
     adversarial_img_np = load_image_as_numpy_array(CONFIG["adversarial_image_path"])
 
+    # create segments
+    segmentation_function = SegmentationAlgorithm('quickshift', kernel_size=4,
+                                                  max_dist=200, ratio=0.2,
+                                                  random_seed=CONFIG["random_seed"])
+    original_segments = segmentation_function(original_img_np)
+    adversarial_segments = segmentation_function(adversarial_img_np)
+    segments = torch.from_numpy(np.stack((original_segments, adversarial_segments))).to(device)
+
     # Load images as PyTorch Tensors
-    original_img_tensor = read_image(CONFIG["original_image_path"]).to(device)
-    adversarial_img_tensor = read_image(CONFIG["adversarial_image_path"]).to(device)
-    images_tensor = torch.cat((original_img_tensor, adversarial_img_tensor), 0)
+    transform = CONFIG["transform"]
+    original_img_tensor = transform(pil_read(CONFIG["original_image_path"]))
+    adversarial_img_tensor = transform(pil_read(CONFIG["adversarial_image_path"]))
+    images_tensor = torch.stack((original_img_tensor, adversarial_img_tensor), dim=0).to(device)
+    # images_tensor = (images_tensor / 255.0).to(device)
+    # labels_tensor = torch.tensor((243, 242)).to(device)
+    labels_tensor = [1, 0]
 
     # Create classifier function
     classifier_func = partial(classify_dogs_vs_cats, model, device)
+    # classifier_func = partial(classify_function, model)
 
     explain(lime_explainer, model, classifier_func, original_img_np, adversarial_img_np)
+    # explain_captum(model, classifier_func, images_tensor, labels_tensor, segments)
