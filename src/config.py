@@ -8,6 +8,6 @@ TRAIN_CSV = "train_dogs_vs_cats.csv"
 TEST_CSV = "test_dogs_vs_cats.csv"
 
 LABEL_MAPPING = {
-    "0": "cat",
-    "1": "dog"
+    0: "cat",
+    1: "dog"
 }

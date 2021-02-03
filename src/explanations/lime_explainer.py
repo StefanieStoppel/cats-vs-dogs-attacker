@@ -32,7 +32,7 @@ class LimeExplainer:
 
         print(f"Top labels:")
         for idx, (class_idx, class_probability) in enumerate(zip(explanation.top_labels, probabilities), 1):
-            print(f"\t{class_idx})  '{LABEL_MAPPING[str(class_idx)]}: {class_probability.max()}'")
+            print(f"\t{class_idx})  '{LABEL_MAPPING[class_idx]}: {class_probability.max()}'")
 
         img_boundary = mark_boundaries(img / 255.0, mask)
         return img_boundary
