@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
 from dataloader import get_dogs_vs_cats_data_splits
-from lit_model import LitVGG16Model
+from models.lit_model import LitVGG16Model
 from src.config import DATA_PATH, LOGS_PATH
 from src.util import timeit
 

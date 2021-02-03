@@ -6,7 +6,7 @@ from torchvision.transforms import transforms
 
 from config import DATA_PATH, LOGS_PATH
 from dataloader import get_dogs_vs_cats_data_splits
-from lit_model import LitVGG16Model
+from models.lit_model import LitVGG16Model
 
 
 def run(config):

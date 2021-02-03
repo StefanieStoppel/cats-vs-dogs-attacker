@@ -5,7 +5,7 @@ from torchvision.transforms import transforms
 
 from config import LOGS_PATH
 from explanations.captum_explainer import CaptumExplainer
-from lit_model import LitVGG16Model
+from models.lit_model import LitVGG16Model
 from losses.loss import combined_loss
 from util import load_image_as_numpy_array, pil_read
 
