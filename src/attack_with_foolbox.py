@@ -10,9 +10,11 @@ from typing import Union, Sequence
 from eagerpy import Tensor
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
+from tqdm import tqdm
 
 from dataloader import get_dogs_vs_cats_data_splits
 from models.lit_model import LitVGG16Model
+from src import ROOT_DIR
 from src.config import DATA_PATH, LOGS_PATH
 from src.util import timeit
 
@@ -34,7 +36,7 @@ CONFIG = {
 
     # Training
     "data_split": (0.7, 0.2, 0.1),
-    "batch_size": 16,
+    "batch_size": 64,
     "num_workers": 2,
     "use_cuda": True,
 }
@@ -45,7 +47,7 @@ def wrap_model(model, bounds, preprocessing, device):
     return foolbox_model
 
 
-@timeit
+# @timeit
 def attack_model(attack: fb.Attack,
                  foolbox_model: fb.PyTorchModel,
                  images: ep.Tensor,
@@ -84,12 +86,12 @@ def run_attack(fb_attack: fb.Attack,
                labels: torch.Tensor,
                file_names: torch.Tensor,
                config):
-    print(f"Initial accuracy on images: {fb.utils.accuracy(foolbox_model, images, labels)}")
+    # print(f"Initial accuracy on images: {fb.utils.accuracy(foolbox_model, images, labels)}")
 
     # filter input images and labels so that only the ones which are correctly classified are kept
-    print(f"before filtering: {images.shape}; {labels.shape}")
+    # print(f"before filtering: {images.shape}; {labels.shape}")
     images, labels, file_names = filter_correctly_classified(foolbox_model, images, labels, file_names)
-    print(f"after filtering: {images.shape}; {labels.shape}")
+    # print(f"after filtering: {images.shape}; {labels.shape}")
     if images.nelement() == 0:
         raise SystemExit("SYSTEM_EXIT: No images left after filtering. Are you sure you trained your model correctly "
                          "to classify the input images?")
@@ -99,31 +101,34 @@ def run_attack(fb_attack: fb.Attack,
 
     robust_accuracy = 1 - ep.astensor(is_adv.type(torch.FloatTensor)).mean(axis=-1)
 
-    print("Predictions and robust accuracies: ")
+    adv_count = 0
+    # print("Predictions and robust accuracies: ")
     for i, (eps, acc, clipped_adv) in enumerate(zip(epsilons, robust_accuracy, clipped)):
-        print(f"!!!! Linf norm ≤ {eps:<6}: {acc.item() * 100:4.1f} %")
+        # print(f"!!!! Linf norm ≤ {eps:<6}: {acc.item() * 100:4.1f} %")
         adversarial_mask = torch.nonzero(is_adv.flatten()).flatten()
-        print(f"Amount of true adversarial images: {len(adversarial_mask)}.")
+        adv_count += len(adversarial_mask)
+        # print(f"Amount of true adversarial images: {len(adversarial_mask)}.")
         original_images = images[adversarial_mask]
         original_image_names = file_names[adversarial_mask.cpu()]
         adversarial_images = clipped_adv[adversarial_mask]
 
-        original_pred = foolbox_model(original_images).argmax(axis=-1)
-        adv_pred = foolbox_model(adversarial_images).argmax(axis=-1)
-        ground_truth_labels = labels[adversarial_mask]
+        # original_pred = foolbox_model(original_images).argmax(axis=-1)
+        # adv_pred = foolbox_model(adversarial_images).argmax(axis=-1)
+        # ground_truth_labels = labels[adversarial_mask]
 
-        pp.pprint(f"Ground truth: {ground_truth_labels}")
-        pp.pprint(f"Original:     {original_pred}")
-        pp.pprint(f"Adversarial:  {adv_pred}")
+        # pp.pprint(f"Ground truth: {ground_truth_labels}")
+        # pp.pprint(f"Original:     {original_pred}")
+        # pp.pprint(f"Adversarial:  {adv_pred}")
 
         if config["save_adversaries"]:
-            target_dir = os.path.join(config["target_dir"], fb_attack.__class__.__name__, str(eps))
-            save_attacked_images(adversarial_images, original_images, original_image_names, target_dir)
+            # target_dir = os.path.join(config["target_dir"], fb_attack.__class__.__name__, str(eps))
+            save_attacked_images(adversarial_images, original_images, original_image_names, config["target_dir"])
+    return adv_count
 
 
 def save_attacked_images(adversarial_images, original_images, original_image_names, target_dir):
     os.makedirs(target_dir, exist_ok=True)
-    print(f"Saving original & adversarial images in directory '{target_dir}'.")
+    # print(f"Saving original & adversarial images in directory '{target_dir}'.")
     for original_img, adv_img, orig_image_name in zip(original_images, adversarial_images, original_image_names):
         target_name_base = orig_image_name.item().replace(".jpg", "")
         original_path = os.path.join(target_dir, f"{target_name_base}_orig.jpg")
@@ -142,9 +147,7 @@ def run():
     #                                  transforms.ToTensor(),
     #                                  transforms.Normalize([0.485, 0.456, 0.406],
     #                                                       [0.229, 0.224, 0.225])])
-    transform = transforms.Compose([transforms.RandomRotation(15),
-                                    transforms.RandomResizedCrop(224),
-                                    transforms.RandomHorizontalFlip(),
+    transform = transforms.Compose([transforms.CenterCrop(224),
                                     transforms.ToTensor()])
 
     train_dataset, validation_dataset, test_dataset = get_dogs_vs_cats_data_splits(CONFIG["train_dir"],
@@ -161,10 +164,23 @@ def run():
     test_loader = DataLoader(test_dataset,
                              batch_size=CONFIG["batch_size"])
 
-    images, labels, file_names = next(iter(test_loader))
-    images = images.to(device)
-    labels = labels.to(device)
-    file_names = ep.astensor(np.array(file_names))
+    data_preparation_config = {
+        "train": {
+            "loader": train_loader,
+            "target_dir": os.path.join(ROOT_DIR, "data/data_adv/train"),
+            "true_adversarials": 0
+        },
+        "validation": {
+            "loader": validation_loader,
+            "target_dir": os.path.join(ROOT_DIR, "data/data_adv/validation"),
+            "true_adversarials": 0
+        },
+        "test": {
+            "loader": test_loader,
+            "target_dir": os.path.join(ROOT_DIR, "data/data_adv/test"),
+            "true_adversarials": 0
+        }
+    }
 
     # Load model
     lit_model = LitVGG16Model.load_from_checkpoint(checkpoint_path=CONFIG["checkpoint"])
@@ -176,7 +192,21 @@ def run():
 
     attack = CONFIG["attack"]
 
-    run_attack(attack, fmodel, images, labels, file_names, CONFIG)
+    for stage, config in data_preparation_config.items():
+        data_loader = config["loader"]
+        CONFIG["target_dir"] = config["target_dir"]
+        true_adversarials = config["true_adversarials"]
+        print(f"Processing images for stage '{stage}'.")
+
+        for images, labels, file_names in tqdm(data_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+            file_names = ep.astensor(np.array(file_names))
+
+            adv_count = run_attack(attack, fmodel, images, labels, file_names, CONFIG)
+            true_adversarials += adv_count
+
+        print(f"Adversarials out of all {stage} data: {true_adversarials} / {len(data_loader.dataset)}")
 
 
 if __name__ == '__main__':

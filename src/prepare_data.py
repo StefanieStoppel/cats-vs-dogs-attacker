@@ -3,6 +3,7 @@ import pandas as pd
 
 from typing import List
 
+from src import ROOT_DIR
 from src.config import DATA_PATH
 
 
@@ -32,6 +33,21 @@ def save_dogs_vs_cats_file_list(data_path, target_file_name):
     pd.DataFrame(file_list).to_csv(os.path.join(data_path, target_file_name), index=False, header=False)
 
 
+def save_dogs_vs_cats_adversarial_file_list(data_path, target_file_path):
+    file_list = list()
+    for root, dirs, files in os.walk(data_path):
+        for file in files:
+            if file.endswith("orig.jpg"):
+                label = 0
+                adv_label = 1
+                if "dog" in file:
+                    label = 1
+                    adv_label = 0
+                adv_file = file.replace("orig.jpg", "adv.jpg")
+                file_list.append((file, label, adv_file, adv_label))
+    pd.DataFrame(file_list).to_csv(os.path.join(target_file_path), index=False, header=False)
+
+
 def get_images_and_labels(dir_path, is_test=False):
     images, labels = list(), list()
     for file in os.listdir(dir_path):
@@ -54,4 +70,10 @@ if __name__ == '__main__':
     # test_csv_path = os.path.join(DATA_PATH, TEST_CSV)
     # save_dogs_vs_cats_dataframes(DATA_PATH, [train_csv_path, test_csv_path])
     # save_dogs_vs_cats_file_list(os.path.join(DATA_PATH, "train"), os.path.join(DATA_PATH, "train_list.csv"))
-    save_dogs_vs_cats_file_list(os.path.join(DATA_PATH, "test"), os.path.join(DATA_PATH, "test_list.csv"))
+    # save_dogs_vs_cats_file_list(os.path.join(DATA_PATH, "test"), os.path.join(DATA_PATH, "test_list.csv"))
+    # save_dogs_vs_cats_adversarial_file_list(os.path.join(ROOT_DIR, "data/data_adv/train"),
+    #                                         os.path.join(ROOT_DIR, "data/data_adv/train_adv.csv"))
+    save_dogs_vs_cats_adversarial_file_list(os.path.join(ROOT_DIR, "data/data_adv/validation"),
+                                            os.path.join(ROOT_DIR, "data/data_adv/validation_adv.csv"))
+    save_dogs_vs_cats_adversarial_file_list(os.path.join(ROOT_DIR, "data/data_adv/test"),
+                                            os.path.join(ROOT_DIR, "data/data_adv/test_adv.csv"))
