@@ -1,8 +1,39 @@
 import os
-
 import torch
-from torch.utils.data import DataLoader
+import pandas as pd
+
+from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets
+
+from util import pil_read
+
+
+class DogVsCatWithAdversarialsDataset(Dataset):
+    def __init__(self, data_txt_file, dirname, mode='train', transform=None):
+        self.data = pd.read_csv(data_txt_file, delimiter=",", header=None, names=["orig", "orig_idx", "adv", "adv_idx"])
+        self.data = self.data.to_numpy()
+        self.orig_idx, self.orig_label_idx, self.adv_idx, self.adv_label_idx = 0, 1, 2, 3
+        self.dirname = dirname
+        self.mode = mode
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        row = self.data[idx]
+        orig_img_name = row[self.orig_idx]
+        orig_img = pil_read(os.path.join(self.dirname, orig_img_name))
+        orig_label = row[self.orig_label_idx]
+
+        adv_img_name = row[self.adv_idx]
+        adv_img = pil_read(os.path.join(self.dirname, adv_img_name))
+        adv_label = row[self.adv_label_idx]
+
+        if self.transform:
+            orig_img = self.transform(orig_img)
+            adv_img = self.transform(adv_img)
+        return orig_img, adv_img, orig_label, adv_label, orig_img_name, adv_img_name
 
 
 def get_dogs_vs_cats_data_splits(data_dir, data_split=(0.7, 0.2, 0.1), transform=None, random_seed=42):
@@ -41,3 +72,10 @@ def dataset_with_file_names(cls):
     return type(cls.__name__, (cls,), {
         '__getitem__': __getitem__,
     })
+
+
+if __name__ == '__main__':
+    csv_path = "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/data_adv/train_adv.csv"
+    dirname = "/home/steffi/dev/master_thesis/cats-vs-dogs-attacker/data/data_adv/train"
+    dataset = DogVsCatWithAdversarialsDataset(csv_path, dirname)
+    dataset.__getitem__(2493)
