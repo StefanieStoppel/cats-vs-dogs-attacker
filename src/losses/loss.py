@@ -11,7 +11,15 @@ def pearson_cross_correlation_torch(output, target):
     vx = x - torch.mean(x)
     vy = y - torch.mean(y)
 
-    pcc = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
+    if torch.count_nonzero(vx) == 0:
+        raise SystemExit(f"First tensor of PCC was all zeros. Cannot calculate correlation coefficient.")
+
+    double_sum_vx = torch.sum(vx ** 2)
+    double_sum_vy = torch.sum(vy ** 2)
+    if double_sum_vy < 0 or double_sum_vy < 0:
+        raise SystemExit(f"Sum was < 0: PCC cannot be calculated for negative numbers due to sqrt().")
+
+    pcc = torch.sum(vx * vy) / (torch.sqrt(double_sum_vx) * torch.sqrt(double_sum_vy))
     return pcc
 
 
@@ -43,22 +51,21 @@ def similarity_loss_pcc(original_explanation: torch.Tensor, adv_explanation: tor
     return loss
 
 
-def adv_cross_entropy(model, adv_image, gt_label):
-    target_label = 1 - gt_label  # todo: fix dirty hack ;)
-    pred_label = model(adv_image)
-    adv_loss = cross_entropy(pred_label, target_label)
+def adv_cross_entropy(adv_gt_label, adv_pred_label):
+    adv_loss = cross_entropy(adv_gt_label, adv_pred_label)
     return adv_loss
 
 
-# TODO: add hyperparameters for loss weighing
-def combined_loss(model, orig_image, adv_image, orig_explanation, adv_explanation, gt_label):
-    pred_label = model(orig_image)
+def combined_loss(model, orig_image, adv_image, orig_explanation,
+                  adv_explanation, gt_label, adv_label, gammas=(1, 1, 2)):
+    orig_pred_label = model(orig_image)
     # Part 1: CrossEntropy for original image
-    original_image_loss = cross_entropy(pred_label, gt_label)
+    original_image_loss = cross_entropy(orig_pred_label, gt_label)
     # Part 2: CrossEntropy for adv image
-    adv_image_loss = adv_cross_entropy(model, adv_image, gt_label)
+    adv_pred_label = model(adv_image)
+    adv_image_loss = adv_cross_entropy(adv_label, adv_pred_label)
     # Part 3: "Similarity" (Pearson Cross Correlation) between original and adversarial explanations
     # returns:
     pcc_loss = similarity_loss_pcc(orig_explanation, adv_explanation)
-    loss = original_image_loss + adv_image_loss + pcc_loss
-    return loss
+    loss = (gammas[0] * original_image_loss) + (gammas[1] * adv_image_loss) + (gammas[2] * pcc_loss)
+    return loss, original_image_loss, adv_image_loss, pcc_loss
