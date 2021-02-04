@@ -13,7 +13,9 @@ from models.lit_fooled_model import LitFooledModel
 
 
 def run_train_adv(config):
-    lit_fooled_model = LitFooledModel(config["lr"])
+    lit_fooled_model = LitFooledModel(config["lr"]).load_from_checkpoint(
+        checkpoint_path=config["checkpoint"]
+    )
 
     # Explainer
     explainer = CaptumExplainer(config["xai_algorithm"], lit_fooled_model.model)
@@ -54,9 +56,7 @@ if __name__ == '__main__':
         "checkpoint": os.path.join(LOGS_PATH, "default/version_10/checkpoints/epoch=0-step=136.ckpt"),
 
         # Transform images
-        "transform": transforms.Compose([transforms.RandomRotation(30),
-                                         transforms.RandomResizedCrop(224),
-                                         transforms.RandomHorizontalFlip(),
+        "transform": transforms.Compose([transforms.CenterCrop(224),
                                          transforms.ToTensor(),
                                          transforms.Normalize([0.485, 0.456, 0.406],
                                                               [0.229, 0.224, 0.225])]),

@@ -11,11 +11,12 @@ def pearson_cross_correlation_torch(output, target):
     vx = x - torch.mean(x)
     vy = y - torch.mean(y)
 
-    if torch.count_nonzero(vx) == 0:
-        raise SystemExit(f"First tensor of PCC was all zeros. Cannot calculate correlation coefficient.")
+    # if torch.count_nonzero(vx) == 0:
+    #     raise SystemExit(f"First tensor of PCC was all zeros. Cannot calculate correlation coefficient.")
 
     double_sum_vx = torch.sum(vx ** 2)
     double_sum_vy = torch.sum(vy ** 2)
+
     if double_sum_vy < 0 or double_sum_vy < 0:
         raise SystemExit(f"Sum was < 0: PCC cannot be calculated for negative numbers due to sqrt().")
 
@@ -52,7 +53,7 @@ def similarity_loss_pcc(original_explanation: torch.Tensor, adv_explanation: tor
 
 
 def adv_cross_entropy(adv_gt_label, adv_pred_label):
-    adv_loss = cross_entropy(adv_gt_label, adv_pred_label)
+    adv_loss = cross_entropy(adv_pred_label, adv_gt_label)
     return adv_loss
 
 
