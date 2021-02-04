@@ -17,7 +17,7 @@ class CaptumExplainer:
         return tensor_attributions
 
     def explain(self, model, image, target_label, **kwargs):
-        model.zero_grad()
+        model.zero_grad()  # todo: do I really need to call this?
         attr_lime = self.attribute_image_features(image,
                                                   target_label,
                                                   **kwargs)
