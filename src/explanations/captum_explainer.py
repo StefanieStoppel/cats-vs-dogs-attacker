@@ -16,12 +16,11 @@ class CaptumExplainer:
                                                            )
         return tensor_attributions
 
-    def explain(self, model, image, target_label, **kwargs):
-        model.zero_grad()  # todo: do I really need to call this?
-        attr_lime = self.attribute_image_features(image,
-                                                  target_label,
-                                                  **kwargs)
-        return attr_lime
+    def explain(self, image, target_label, **kwargs):
+        explanation = self.attribute_image_features(image,
+                                                    target_label,
+                                                    **kwargs)
+        return explanation
 
     def visualize(self, attributions: torch.Tensor, images: torch.Tensor, titles=()):
         attr_dl = np.transpose(attributions.cpu().detach().numpy(), (0, 2, 3, 1))
