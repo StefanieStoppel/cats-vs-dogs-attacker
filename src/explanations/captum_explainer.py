@@ -5,8 +5,8 @@ from captum.attr import visualization as viz
 
 
 class CaptumExplainer:
-    def __init__(self, algorithm, model: torch.nn.Module, random_seed=42):
-        self.xai_algorithm = algorithm(model)
+    def __init__(self, algorithm, random_seed=42):
+        self.xai_algorithm = algorithm
         self.random_seed = random_seed
 
     def attribute_image_features(self, image, target_label, **kwargs):

@@ -75,11 +75,6 @@ def similarity_loss_ssim(original_explanation: torch.Tensor, adv_explanation: to
     return ssim_loss
 
 
-def adv_cross_entropy(adv_gt_label, adv_pred_label):
-    adv_loss = cross_entropy(adv_gt_label, adv_pred_label)
-    return adv_loss
-
-
 def combined_loss(model, orig_image, adv_image, orig_explanation,
                   adv_explanation, gt_label, adv_label, gammas=(1, 1, 2)):
     orig_pred_label = model(orig_image)
@@ -88,7 +83,7 @@ def combined_loss(model, orig_image, adv_image, orig_explanation,
     check_nan(original_image_loss, "orig_ce_loss")
     # Part 2: CrossEntropy for adv image
     adv_pred_label = model(adv_image)
-    adv_image_loss = adv_cross_entropy(adv_label, adv_pred_label)
+    adv_image_loss = cross_entropy(adv_pred_label, adv_label)
     check_nan(adv_image_loss, "adv_ce_loss")
     # Part 3: "Similarity" (Pearson Cross Correlation) between original and adversarial explanations
     # returns:

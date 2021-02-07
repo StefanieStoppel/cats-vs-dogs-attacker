@@ -18,7 +18,8 @@ def run_train_adv(config):
     lit_fooled_model = LitFooledModel(config["lr"])
 
     # Explainer
-    explainer = CaptumExplainer(config["xai_algorithm"], lit_fooled_model.model)
+    xai_algorithm = config["xai_algorithm"](lit_fooled_model.model)
+    explainer = CaptumExplainer(xai_algorithm)
     lit_fooled_model.set_explainer(explainer)
 
     train_dataset = DogVsCatWithAdversarialsDataset(config["train_csv"],
@@ -133,5 +134,5 @@ if __name__ == '__main__':
         "xai_algorithm": DeepLift,
 
     }
-    # run_train_adv(config=CONFIG)
-    run_test_pcc(config=CONFIG)
+    run_train_adv(config=CONFIG)
+    # run_test_pcc(config=CONFIG)
