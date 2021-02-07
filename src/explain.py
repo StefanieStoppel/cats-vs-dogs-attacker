@@ -6,7 +6,7 @@ from torchvision.transforms import transforms
 from config import LOGS_PATH
 from explanations.captum_explainer import CaptumExplainer
 from models.lit_model import LitVGG16Model
-from losses.loss import combined_loss
+from losses.loss import combined_loss, similarity_loss_ssim
 from util import load_image_as_numpy_array, pil_read
 
 
@@ -54,14 +54,17 @@ if __name__ == '__main__':
     plot_titles = ("DeepLIFT for cat (0, original)", "DeepLIFT for dog (1, adversarial)")
 
     # Create explanations
-    attributions = deeplift_explainer.explain(model, images_tensor, labels_tensor, baselines=images_tensor * 0)
+    attributions = deeplift_explainer.explain(images_tensor, labels_tensor, baselines=images_tensor * 0)
+
+    ssim_loss = similarity_loss_ssim(images_tensor[0].unsqueeze(0), images_tensor[1].unsqueeze(0))
 
     loss = combined_loss(model,
                          images_tensor[0].unsqueeze(0),
                          images_tensor[1].unsqueeze(0),
                          attributions[0],
                          attributions[1],
-                         labels_tensor[0].unsqueeze(0))
+                         labels_tensor[0].unsqueeze(0),
+                         labels_tensor[1].unsqueeze(0))
     print("total_loss: ", loss)
 
     # Visualize
