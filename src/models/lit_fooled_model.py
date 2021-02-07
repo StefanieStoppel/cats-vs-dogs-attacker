@@ -54,12 +54,10 @@ class LitFooledModel(LitVGG16Model):
 
     def _create_explanation_map(self, original_image, adversarial_image, gt_label, adv_label):
         # adv_label = 1 - gt_label
-        original_explanation_maps = self.explainer.explain(self.model,
-                                                           original_image,
+        original_explanation_maps = self.explainer.explain(original_image,
                                                            gt_label,
                                                            baselines=original_image * 0)
-        adversarial_explanation_maps = self.explainer.explain(self.model,
-                                                              adversarial_image,
+        adversarial_explanation_maps = self.explainer.explain(adversarial_image,
                                                               adv_label,
                                                               baselines=adversarial_image * 0)
         return original_explanation_maps, adversarial_explanation_maps
