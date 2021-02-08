@@ -39,6 +39,8 @@ def run(config):
 
 
 def run_test(config):
+    hparams = config["hparams"]
+    batch_size = hparams["batch_size"]
     lit_vgg16_model = LitVGG16Model.load_from_checkpoint(
         checkpoint_path=config["checkpoint"]
     )
@@ -48,7 +50,7 @@ def run_test(config):
         transform=config["transform"]
     )
 
-    test_loader = DataLoader(test_dataset, batch_size=config["batch_size"],
+    test_loader = DataLoader(test_dataset, batch_size=batch_size,
                              shuffle=False, num_workers=config["num_workers"])
 
     tb_logger = pl_loggers.TensorBoardLogger(config["logs_dir"])
@@ -65,7 +67,7 @@ if __name__ == '__main__':
         "train_csv": os.path.join(DATA_PATH, "train_list.csv"),
         "test_csv": os.path.join(DATA_PATH, "test_list.csv"),
         "logs_dir": LOGS_PATH,
-        "checkpoint": os.path.join(LOGS_PATH, "default/version_10/checkpoints/epoch=0-step=136.ckpt"),
+        "checkpoint": os.path.join(LOGS_PATH, "default/version_13/checkpoints/epoch=0-step=136.ckpt"),
         # "checkpoint": "best",
 
         # Transform images
@@ -78,6 +80,7 @@ if __name__ == '__main__':
         "hparams": {
             "lr": 1e-4,
             "batch_size": 128,
+            "num_classes": 2
         },
         # Training
         "data_split": (0.7, 0.2, 0.1),
