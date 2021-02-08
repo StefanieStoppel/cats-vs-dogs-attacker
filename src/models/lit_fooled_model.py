@@ -1,17 +1,45 @@
+from torch.nn.functional import cross_entropy
+
 from explanations.captum_explainer import CaptumExplainer
-from losses.loss import combined_loss
+from losses.loss import check_nan
 from models.lit_model import LitVGG16Model
 
 
 class LitFooledModel(LitVGG16Model):
-    def __init__(self, lr=1e-3, num_classes=2):
-        super(LitFooledModel, self).__init__(lr=lr, num_classes=num_classes)
+    def __init__(self, hparams):
+        super(LitFooledModel, self).__init__(lr=hparams["lr"], num_classes=2)
         self.loss = None
-        self.combined_loss = combined_loss
         self.explainer = None
+
+        self.hparams = hparams
+        self.similarity_loss = hparams["similarity_loss"]
+        self.gammas = hparams["gammas"]
+        self.lr = hparams["lr"]
+
+        self.save_hyperparameters()
 
     def set_explainer(self, explainer: CaptumExplainer):
         self.explainer = explainer
+
+    def combined_loss(self, orig_image, adv_image, orig_explanation,
+                      adv_explanation, gt_label, adv_label):
+        orig_pred_label = self.model(orig_image)
+
+        # Part 1: CrossEntropy for original image
+        original_image_loss = cross_entropy(orig_pred_label, gt_label)
+        check_nan(original_image_loss, "orig_ce_loss")
+
+        # Part 2: CrossEntropy for adv image
+        adv_pred_label = self.model(adv_image)
+        adv_image_loss = cross_entropy(adv_pred_label, adv_label)
+        check_nan(adv_image_loss, "adv_ce_loss")
+
+        # Part 3: "Similarity" between original and adversarial explanations
+        sim_loss = self.similarity_loss(orig_explanation, adv_explanation)
+        loss = (self.gammas[0] * original_image_loss) + \
+               (self.gammas[1] * adv_image_loss) + \
+               (self.gammas[2] * sim_loss)
+        return loss, original_image_loss, adv_image_loss, sim_loss
 
     # overrides
     def training_step(self, batch, batch_idx):
@@ -20,8 +48,7 @@ class LitFooledModel(LitVGG16Model):
                                                                                              adversarial_image,
                                                                                              gt_label,
                                                                                              adv_label)
-        loss, original_image_loss, adv_image_loss, pcc_loss = self.combined_loss(self.model,
-                                                                                 original_image,
+        loss, original_image_loss, adv_image_loss, pcc_loss = self.combined_loss(original_image,
                                                                                  adversarial_image,
                                                                                  original_explanation_map,
                                                                                  adversarial_explanation_map,
@@ -30,7 +57,7 @@ class LitFooledModel(LitVGG16Model):
         self.log("train_loss_combined", loss, on_step=True, logger=True)
         self.log("train_loss_orig_ce", original_image_loss, on_step=True, logger=True)
         self.log("train_loss_adv_ce", adv_image_loss, on_step=True, logger=True)
-        self.log("train_loss_sim_pcc", pcc_loss, on_step=True, logger=True)
+        self.log("train_loss_sim", pcc_loss, on_step=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -39,8 +66,7 @@ class LitFooledModel(LitVGG16Model):
                                                                                              adversarial_image,
                                                                                              gt_label,
                                                                                              adv_label)
-        loss, original_image_loss, adv_image_loss, pcc_loss = self.combined_loss(self.model,
-                                                                                 original_image,
+        loss, original_image_loss, adv_image_loss, pcc_loss = self.combined_loss(original_image,
                                                                                  adversarial_image,
                                                                                  original_explanation_map,
                                                                                  adversarial_explanation_map,

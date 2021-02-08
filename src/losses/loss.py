@@ -75,24 +75,6 @@ def similarity_loss_ssim(original_explanation: torch.Tensor, adv_explanation: to
     return ssim_loss
 
 
-def combined_loss(model, orig_image, adv_image, orig_explanation,
-                  adv_explanation, gt_label, adv_label, gammas=(1, 1, 2)):
-    orig_pred_label = model(orig_image)
-    # Part 1: CrossEntropy for original image
-    original_image_loss = cross_entropy(orig_pred_label, gt_label)
-    check_nan(original_image_loss, "orig_ce_loss")
-    # Part 2: CrossEntropy for adv image
-    adv_pred_label = model(adv_image)
-    adv_image_loss = cross_entropy(adv_pred_label, adv_label)
-    check_nan(adv_image_loss, "adv_ce_loss")
-    # Part 3: "Similarity" (Pearson Cross Correlation) between original and adversarial explanations
-    # returns:
-    # pcc_loss = similarity_loss_pcc(orig_explanation, adv_explanation)
-    ssim_loss = similarity_loss_ssim(orig_explanation, adv_explanation)
-    loss = (gammas[0] * original_image_loss) + (gammas[1] * adv_image_loss) + (gammas[2] * ssim_loss)
-    return loss, original_image_loss, adv_image_loss, ssim_loss
-
-
 def check_nan(tensor, loss_name):
     if torch.isnan(tensor).any():
         raise SystemExit(f"NaN in {loss_name}!")
