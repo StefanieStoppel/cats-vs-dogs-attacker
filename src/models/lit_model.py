@@ -8,10 +8,12 @@ from src.util import weight_reset
 
 class LitVGG16Model(pl.LightningModule):
 
-    def __init__(self, lr=1e-3, num_classes=2):
+    def __init__(self, hparams):
         super().__init__()
-        self.lr = lr
-        self.num_classes = num_classes
+        self.hparams = hparams
+        self.lr = hparams["lr"]
+        self.num_classes = hparams["num_classes"]
+        self.save_hyperparameters()
 
         self.loss = CrossEntropyLoss()
 

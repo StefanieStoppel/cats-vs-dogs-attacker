@@ -10,20 +10,28 @@ from models.lit_model import LitVGG16Model
 
 
 def run(config):
-    lit_vgg16_model = LitVGG16Model(config["lr"])
+    train_dir = config["train_dir"]
+    logs_dir = config["logs_dir"]
+    data_splits = config["data_split"]
+    num_workers = config["num_workers"]
+    data_transforms = config["transform"]
+    hparams = config["hparams"]
+    batch_size = hparams["batch_size"]
+
+    lit_vgg16_model = LitVGG16Model(hparams)
 
     train_dataset, validation_dataset, test_dataset = get_dogs_vs_cats_data_splits(
-        config["train_dir"],
-        config["data_split"],
-        transform=config["transform"]
+        train_dir,
+        data_splits,
+        transform=data_transforms
     )
-    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"],
-                              shuffle=True, num_workers=config["num_workers"])
-    validation_loader = DataLoader(validation_dataset, batch_size=config["batch_size"],
-                                   shuffle=False, num_workers=config["num_workers"])
+    train_loader = DataLoader(train_dataset, batch_size=batch_size,
+                              shuffle=True, num_workers=num_workers)
+    validation_loader = DataLoader(validation_dataset, batch_size=batch_size,
+                                   shuffle=False, num_workers=num_workers)
 
     # init logging
-    tb_logger = pl_loggers.TensorBoardLogger(config["logs_dir"])
+    tb_logger = pl_loggers.TensorBoardLogger(logs_dir)
     trainer = Trainer(logger=tb_logger, gpus=1)
 
     # run training
@@ -67,12 +75,13 @@ if __name__ == '__main__':
                                          transforms.ToTensor(),
                                          transforms.Normalize([0.485, 0.456, 0.406],
                                                               [0.229, 0.224, 0.225])]),
-
+        "hparams": {
+            "lr": 1e-4,
+            "batch_size": 128,
+        },
         # Training
         "data_split": (0.7, 0.2, 0.1),
-        "batch_size": 128,
         "num_workers": 8,
-        "lr": 1e-4
     }
     run_test(CONFIG)
     # run(CONFIG)
