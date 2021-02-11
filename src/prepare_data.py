@@ -4,7 +4,6 @@ import pandas as pd
 from typing import List
 
 from src import ROOT_DIR
-from src.config import DATA_PATH
 
 
 def save_dogs_vs_cats_dataframes(data_path, target_paths: List[str]):
