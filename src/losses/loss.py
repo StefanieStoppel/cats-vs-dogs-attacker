@@ -2,17 +2,8 @@ import torch
 
 from pytorch_msssim import ssim
 from scipy import stats
-from torch.nn.functional import cross_entropy
 
-
-def map_image_to_unit_interval(image):
-    # add 1 to map image in range [-1, 1] to [0, 2]
-    tensor_image = image + 1
-    # step 2: convert it to [0 ,1]
-    tensor_image = tensor_image - tensor_image.min()
-    tensor_image_0_1 = tensor_image / (tensor_image.max() - tensor_image.min())
-
-    return tensor_image_0_1
+from util import map_image_to_unit_interval
 
 
 def pearson_cross_correlation_torch(output, target):
@@ -24,9 +15,6 @@ def pearson_cross_correlation_torch(output, target):
 
     vx = x_n - torch.mean(x_n)
     vy = y_n - torch.mean(y_n)
-
-    if torch.count_nonzero(vx) == 0:
-        raise SystemExit(f"First tensor of PCC was all zeros. Cannot calculate correlation coefficient.")
 
     double_sum_vx = torch.sum(vx ** 2)
     double_sum_vy = torch.sum(vy ** 2)
