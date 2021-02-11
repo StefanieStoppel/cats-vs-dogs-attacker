@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Union, Tuple
 
 import numpy as np
@@ -53,3 +54,14 @@ class CaptumExplainer:
                                         sign="all",
                                         show_colorbar=True,
                                         title=title)
+
+
+def get_explainer(xai_algorithm, lit_fooled_model):
+    algorithm_name = xai_algorithm.__name__
+    if algorithm_name == "DeepLift":
+        explainer = CaptumExplainer(xai_algorithm(lit_fooled_model.model))
+    if algorithm_name == "LayerGradCam":
+        last_conv2d = lit_fooled_model.model.features[28]
+        explainer = CaptumExplainer(xai_algorithm(lit_fooled_model.model.forward, last_conv2d))
+        explainer.explain = partial(explainer.explain, relu_attributions=True)
+    return explainer
