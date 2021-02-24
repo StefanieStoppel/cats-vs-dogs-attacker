@@ -24,6 +24,8 @@ class LitFooledModel(LitVGG16Model):
         self.lr = hparams["lr"]
         self.batch_size = hparams["batch_size"]
         self.xai_algorithm = hparams["xai_algorithm"]
+        if "xai_algorithm_kwargs" in hparams:
+            self.xai_algorithm_kwargs = hparams["xai_algorithm_kwargs"]
         self.image_log_intervals = {
             "train": 50,
             "val": 20
@@ -85,9 +87,9 @@ class LitFooledModel(LitVGG16Model):
         else:
             original_image, adversarial_image, \
             gt_label, adv_label, original_image_name, adversarial_image_name = batch
+
             original_explanation_map = self.explainer.explain(original_image,
                                                               gt_label)
-            # baselines=original_image * 0)
 
         adversarial_explanation_map = self.explainer.explain(adversarial_image,
                                                              adv_label)
@@ -97,17 +99,22 @@ class LitFooledModel(LitVGG16Model):
         if torch.nonzero(adversarial_explanation_map).numel() == 0:
             print(f"WARNING: explanation for images {adversarial_image_name} contains all zeros!")
 
-        loss, original_image_loss, adv_image_loss, pcc_loss = self.combined_loss(original_image,
-                                                                                 adversarial_image,
-                                                                                 original_explanation_map,
-                                                                                 adversarial_explanation_map,
-                                                                                 gt_label,
-                                                                                 adv_label)
+        loss, original_image_loss, adv_image_loss, similarity_loss = self.combined_loss(original_image,
+                                                                                        adversarial_image,
+                                                                                        original_explanation_map,
+                                                                                        adversarial_explanation_map,
+                                                                                        gt_label,
+                                                                                        adv_label)
+        # sim loss 1: make sure orig truth explanation does not change too much
+        # similarity_loss_1 = self.similarity_loss(original_explanation_map_gt, original_explanation_map_pred)
+        # sim loss 2: force adv exp to be close to orig ground truth
+        # similarity_loss_2 = self.similarity_loss(original_explanation_map_gt, adversarial_explanation_map)
+        # similarity_loss = similarity_loss_1 + similarity_loss_2
 
         self.log(f"{stage}_loss_combined", loss, on_step=True, logger=True)
         self.log(f"{stage}_loss_orig_ce", original_image_loss, on_step=True, logger=True)
         self.log(f"{stage}_loss_adv_ce", adv_image_loss, on_step=True, logger=True)
-        self.log(f"{stage}_loss_sim", pcc_loss, on_step=True, logger=True)
+        self.log(f"{stage}_loss_sim", similarity_loss, on_step=True, logger=True, prog_bar=True)
 
         if self.global_step % self.image_log_intervals[stage] == 0:
             self.log_explanations_to_tensorboard(original_image,
