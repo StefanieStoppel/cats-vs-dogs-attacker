@@ -56,12 +56,12 @@ class CaptumExplainer:
                                         title=title)
 
 
-def get_explainer(xai_algorithm, lit_fooled_model):
+def get_explainer(xai_algorithm, lit_fooled_model, **kwargs):
     algorithm_name = xai_algorithm.__name__
     if algorithm_name == "DeepLift":
         explainer = CaptumExplainer(xai_algorithm(lit_fooled_model.model))
     if algorithm_name == "LayerGradCam":
         last_conv2d = lit_fooled_model.model.features[28]
         explainer = CaptumExplainer(xai_algorithm(lit_fooled_model.model.forward, last_conv2d))
-        explainer.explain = partial(explainer.explain, relu_attributions=True)
+    explainer.explain = partial(explainer.explain, **kwargs)
     return explainer
