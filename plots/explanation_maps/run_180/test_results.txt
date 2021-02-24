@@ -1,0 +1,9 @@
+Used similarity loss: mse_loss
+*Pre-training* total loss for orig and adv explanation maps: 1790.4031181061011
+*Post-training* total loss for orig and adv explanation maps: 80.66661574343125
+*Pre-training* similarity loss for orig and adv explanation maps: 0.0017864099408922006
+*Post-training* similarity loss for orig and adv explanation maps: 7.898251202905747e-05
+*Pre-training* orig CE loss: 0.031126057074350996
+*Post-training* orig CE loss: 0.8720695695859922
+*Pre-training* adv CE loss: 3.962050160486921
+*Post-training* adv CE loss: 0.8120339749742755
